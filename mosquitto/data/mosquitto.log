@@ -1,0 +1,70 @@
+1778455884: mosquitto version 2.1.2 starting
+1778455884: Config loaded from /mosquitto/config/mosquitto.conf.
+1778455884: Bridge support available.
+1778455884: Persistence support available.
+1778455884: TLS support available.
+1778455884: TLS-PSK support available.
+1778455884: Websockets support available.
+1778455884: Opening ipv4 listen socket on port 1883.
+1778455884: Opening ipv6 listen socket on port 1883.
+1778455884: mosquitto version 2.1.2 running
+1778455886: New connection from 172.19.0.3:36474 on port 1883.
+1778455886: New client connected from 172.19.0.3:36474 as backend_node_3b9ec8 (p4, c1, k60).
+1778456156: Client backend_node_3b9ec8 [172.19.0.3:36474] disconnected: connection closed by client.
+1778456157: mosquitto version 2.1.2 terminating
+1778456157: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1778456174: mosquitto version 2.1.2 starting
+1778456174: Config loaded from /mosquitto/config/mosquitto.conf.
+1778456174: Bridge support available.
+1778456174: Persistence support available.
+1778456174: TLS support available.
+1778456174: TLS-PSK support available.
+1778456174: Websockets support available.
+1778456174: Opening ipv4 listen socket on port 1883.
+1778456174: Opening ipv6 listen socket on port 1883.
+1778456174: mosquitto version 2.1.2 running
+1778456176: New connection from 172.19.0.3:36990 on port 1883.
+1778456176: New client connected from 172.19.0.3:36990 as backend_node_3affb0 (p4, c1, k60).
+1778456208: Client backend_node_3affb0 [172.19.0.3:36990] disconnected: connection closed by client.
+1778456208: mosquitto version 2.1.2 terminating
+1778456208: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1778457710: mosquitto version 2.1.2 starting
+1778457710: Config loaded from /mosquitto/config/mosquitto.conf.
+1778457710: Bridge support available.
+1778457710: Persistence support available.
+1778457710: TLS support available.
+1778457710: TLS-PSK support available.
+1778457710: Websockets support available.
+1778457710: Opening ipv4 listen socket on port 1883.
+1778457710: Opening ipv6 listen socket on port 1883.
+1778457710: mosquitto version 2.1.2 running
+1778457711: New connection from 172.19.0.3:50712 on port 1883.
+1778457711: New client connected from 172.19.0.3:50712 as backend_node_c584df (p4, c1, k60).
+1778458434: Client backend_node_c584df [172.19.0.3:50712] disconnected: connection closed by client.
+1778458465: New connection from 172.19.0.1:59184 on port 1883.
+1778458465: New client connected from 172.19.0.1:59184 as backend_node_e10183 (p4, c1, k60).
+1778458626: Client backend_node_e10183 [172.19.0.1:59184] disconnected: connection closed by client.
+1778458637: mosquitto version 2.1.2 terminating
+1778458637: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1778465152: mosquitto version 2.1.2 starting
+1778465152: Config loaded from /mosquitto/config/mosquitto.conf.
+1778465152: Bridge support available.
+1778465152: Persistence support available.
+1778465152: TLS support available.
+1778465152: TLS-PSK support available.
+1778465152: Websockets support available.
+1778465152: Opening ipv4 listen socket on port 1883.
+1778465152: Opening ipv6 listen socket on port 1883.
+1778465152: mosquitto version 2.1.2 running
+1778465247: New connection from 172.19.0.1:42904 on port 1883.
+1778465247: New client connected from 172.19.0.1:42904 as backend_node_211ace (p4, c1, k60).
+1778465633: New connection from 172.19.0.1:47580 on port 1883.
+1778465633: New client connected from 172.19.0.1:47580 as ESP32Client-278d (p4, c1, k15).
+1778465843: New connection from 172.19.0.1:44126 on port 1883.
+1778465843: Client ESP32Client-278d [172.19.0.1:47580] disconnected: session taken over.
+1778465843: New client connected from 172.19.0.1:44126 as ESP32Client-278d (p4, c1, k15).
+1778465866: New connection from 172.19.0.1:45022 on port 1883.
+1778465866: Client ESP32Client-278d [172.19.0.1:44126] disconnected: session taken over.
+1778465866: New client connected from 172.19.0.1:45022 as ESP32Client-278d (p4, c1, k15).
+1778465877: mosquitto version 2.1.2 terminating
+1778465877: Saving in-memory database to /mosquitto/data//mosquitto.db.

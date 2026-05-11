@@ -12,12 +12,22 @@
 // Reemplaza con la IP de la computadora donde corre Mosquitto (Docker)
 const char* mqtt_server = "192.168.1.8"; 
 const int mqtt_port = 1883;
+const int pin_led = 2;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 // Variables de temporización
 unsigned long lastMsg = 0;
+
+void flashLED(int iterations, int wait) {
+  for (int i = 0; i < iterations; i++) {
+    digitalWrite(pin_led, HIGH); // Encender
+    delay(wait);
+    digitalWrite(pin_led, LOW);  // Apagar
+    delay(wait);
+  }
+}
 
 void setup_wifi() {
   delay(10);
@@ -95,6 +105,8 @@ void setup() {
     Serial.begin(115200);
     randomSeed(analogRead(0));
     
+    pinMode(pin_led, OUTPUT);
+    
     setup_wifi();
     
     client.setServer(mqtt_server, mqtt_port);
@@ -127,5 +139,7 @@ void loop() {
         Serial.println(payload);
         
         client.publish("esp32/telemetry", payload.c_str());
+        
+        flashLED(2, 500);
     }
 }

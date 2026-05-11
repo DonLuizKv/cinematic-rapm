@@ -14,9 +14,9 @@ services:
     build:
       context: .
       dockerfile: dockerfile
-    container_name: ramp-back
+    container_name: ramp_back
     ports:
-      - "3000:3000" 
+      - "5000:5000" 
     depends_on:
       - mqtt-broker
     environment:

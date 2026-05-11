@@ -1,31 +1,22 @@
-import express from 'express';
-import path from 'path';
-import http from 'http';
-import { mqttBroker } from './mqttBroker';
-import { initWebSocket } from './ws';
-import apiRoutes from './routes/api';
+import { Ramp } from "./app";
+import { Env } from "./config/Env"
+import { Logger } from "./providers/logs/logger";
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+async function bootstrap() {
+    const application = new Ramp({
+        port: Env.Global.PORT,
+        origins: Env.Global.ORIGINS,
+        mqttHost: Env.Mqtt.HOST,
+    });
 
-// Crear servidor HTTP para adjuntar Socket.io
-const server = http.createServer(app);
-initWebSocket(server);
+    try {
+        await application.load();
+        application.start();
+    } catch (error: unknown) {
+        Logger.error(`Error starting ramp: ${error instanceof Error ? error.message : error}`);
+        await application.stop();
+        process.exit(1);
+    }
+}
 
-app.use(express.json());
-app.use('/public', express.static(path.join(__dirname, '..', 'public')));
-
-// Iniciar conexión MQTT
-mqttBroker.connect();
-
-// Usar rutas separadas para mantener el código limpio
-app.use('/api', apiRoutes);
-
-// Servir la página web (index.html)
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-
-server.listen(PORT, () => {
-    console.log(`🚀 Servidor Express y WebSocket corriendo en el puerto ${PORT}`);
-});
+bootstrap();

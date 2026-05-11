@@ -1,33 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
+
     <title>Dashboard</title>
 </head>
+
 <body>
     <h1>Dashboard</h1>
     <div id="sensors">
         <h2>Sensores</h2>
         <div id="sensors-data"></div>
     </div>
-    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js" integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0" crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"
+        integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
+        crossorigin="anonymous"></script>
     <script>
         const host = window.location.hostname;
-        const port = 3000;
-        const socket = io(`http://${host}:${port}`);
+        const port = 5000;
+
+        const socket = io(`http://${host}:${port}`, {
+            path: "/api/v1/ws",
+            transports: ["websocket"]
+        });
 
         const sensorsData = document.getElementById('sensors-data');
 
-        socket.on('connect', () => {
+        socket.on('connection', () => {
             console.log('Conectado al servidor');
         });
 
-        socket.on('message', (message) => {
+        socket.on('telemetry', (message) => {
             sensorsData.innerHTML = JSON.stringify(message);
             console.log("message", message);
         });
     </script>
 </body>
+
 </html>

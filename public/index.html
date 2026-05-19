@@ -1,42 +1,510 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rampa Instrumentada — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 
 <body>
-    <h1>Dashboard</h1>
-    <div id="sensors">
-        <h2>Sensores</h2>
-        <div id="sensors-data"></div>
+
+  <header class="site-header">
+    <div class="header-left">
+      <span class="header-title">Rampa Instrumentada</span>
+      <span class="header-sub">5 sensores IR · 14 cm entre sensores</span>
     </div>
-    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"
-        integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0"
-        crossorigin="anonymous"></script>
-    <script>
-        const host = window.location.hostname;
-        const port = 5000;
+    <div class="header-right">
+      <nav class="nav-tabs">
+        <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
+        <button class="nav-tab" onclick="showPage('theory')">Teoría</button>
+      </nav>
+      <div class="status-pill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusLabel">En espera</span>
+      </div>
+      <div class="status-pill status-pill--ws">
+        <span class="status-dot" id="wsDot"></span>
+        <span id="wsLabel">WS desconectado</span>
+      </div>
+    </div>
+  </header>
 
-        const socket = io(`http://${host}:${port}`, {
-            path: "/api/v1/ws",
-            transports: ["websocket"]
-        });
+  <div class="page active" id="page-dashboard">
+    <div class="layout">
 
-        const sensorsData = document.getElementById('sensors-data');
+      <section class="col-left">
 
-        socket.on('connection', () => {
-            console.log('Conectado al servidor');
-        });
+        <div class="panel panel--canvas">
+          <div class="panel-header">
+            <span class="panel-title">Vista de sensores</span>
+            <span class="panel-hint" id="canvasHint">Esperando datos del ESP32</span>
+          </div>
+          <div class="ramp-specs">
+            <span class="spec-pill">Sensores <span>S0 – S4</span></span>
+            <span class="spec-pill">Separación <span>14 cm</span></span>
+            <span class="spec-pill">Recorrido <span>56 cm</span></span>
+          </div>
+          <canvas id="rampCanvas"></canvas>
+        </div>
 
-        socket.on('telemetry', (message) => {
-            sensorsData.innerHTML = JSON.stringify(message);
-            console.log("message", message);
-        });
-    </script>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Sesión actual</span>
+            <span class="panel-hint" id="espStatus">ESP32 —</span>
+          </div>
+          <div class="session-meta">
+            <div class="session-meta-item">
+              <span class="session-meta-label">ID sesión</span>
+              <span class="session-meta-value" id="sessionId">—</span>
+            </div>
+            <div class="session-meta-item">
+              <span class="session-meta-label">Orden S0→S4</span>
+              <span class="session-meta-value" id="orderOk">—</span>
+            </div>
+            <div class="session-meta-item">
+              <span class="session-meta-label">Sensores activados</span>
+              <span class="session-meta-value" id="sensorsTriggered">—</span>
+            </div>
+            <div class="session-meta-item">
+              <span class="session-meta-label">Orden real</span>
+              <span class="session-meta-value session-meta-value--mono" id="triggerOrder">—</span>
+            </div>
+            <div class="session-meta-item">
+              <span class="session-meta-label">Interpolados</span>
+              <span class="session-meta-value" id="interpolatedSensors">—</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn--ghost" id="resetBtn" onclick="resetDashboard()">↺ Reiniciar vista</button>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="col-right">
+
+        <div class="metrics-grid">
+          <div class="metric-card" id="mcVel">
+            <span class="metric-label">Velocidad (último tramo)</span>
+            <span class="metric-value" id="mVel">—</span>
+            <span class="metric-unit">m/s</span>
+            <span class="metric-formula">velocities_ms[n−1]</span>
+          </div>
+          <div class="metric-card" id="mcAcc">
+            <span class="metric-label">Aceleración media</span>
+            <span class="metric-value" id="mAcc">—</span>
+            <span class="metric-unit">m/s²</span>
+            <span class="metric-formula">media(accelerations_ms2)</span>
+          </div>
+          <div class="metric-card" id="mcTime">
+            <span class="metric-label">Tiempo total</span>
+            <span class="metric-value" id="mTime">—</span>
+            <span class="metric-unit">s</span>
+            <span class="metric-formula">Δtimestamps_us</span>
+          </div>
+        </div>
+
+        <div class="panel panel--sensors">
+          <div class="panel-header">
+            <span class="panel-title">Sensores (S0 – S4)</span>
+            <span class="panel-hint">Tiempo relativo · Velocidad del tramo anterior</span>
+          </div>
+          <div class="sensors-list" id="sensorsList"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="chart-tabs">
+              <button class="chart-tab active" data-tab="vel">Velocidad / tramo</button>
+              <button class="chart-tab" data-tab="int">Intervalo / tramo</button>
+              <button class="chart-tab" data-tab="acc">Aceleración</button>
+            </div>
+            <span class="panel-hint" id="chartHint">m/s entre disparos consecutivos</span>
+          </div>
+          <div class="chart-pane" id="paneVel">
+            <canvas id="velChart" height="150"></canvas>
+          </div>
+          <div class="chart-pane hidden" id="paneInt">
+            <canvas id="intChart" height="150"></canvas>
+          </div>
+          <div class="chart-pane hidden" id="paneAcc">
+            <canvas id="accChart" height="150"></canvas>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Registro de sesiones</span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span class="panel-hint" id="logCount">0 sesiones</span>
+              <button class="btn-export" id="exportBtn" disabled onclick="exportCSV()">↓ CSV</button>
+            </div>
+          </div>
+          <div class="log-scroll">
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>ID</th>
+                  <th>Sens.</th>
+                  <th>Orden OK</th>
+                  <th>v (m/s)</th>
+                  <th>t (s)</th>
+                </tr>
+              </thead>
+              <tbody id="logBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <div class="page" id="page-theory">
+    <div class="theory-layout">
+      <nav class="theory-nav">
+        <a class="theory-nav-item active" href="#th-ramp">La rampa</a>
+        <a class="theory-nav-item" href="#th-acceleration">Aceleración</a>
+        <a class="theory-nav-item" href="#th-velocity">Velocidad</a>
+        <a class="theory-nav-item" href="#th-time">Tiempo</a>
+        <a class="theory-nav-item" href="#th-sensors">Sensores</a>
+        <a class="theory-nav-item" href="#th-protocol">Protocolo MQTT</a>
+        <a class="theory-nav-item" href="#th-summary">Resumen de sesión</a>
+        <a class="theory-nav-item" href="#th-calc">Cómo calcular</a>
+      </nav>
+
+      <div class="theory-content">
+
+        <div class="theory-section" id="th-ramp">
+          <div class="theory-section-header">
+            <span class="theory-section-title">La rampa instrumentada</span>
+            <span class="theory-tag">Geometría</span>
+          </div>
+          <div class="theory-body">
+            <p class="theory-p">La rampa tiene <strong>47 cm de base</strong>, <strong>40 cm de altura</strong> y
+              <strong>61.7 cm de hipotenusa</strong>. El ángulo de inclinación es <strong>40.4°</strong> respecto al suelo:</p>
+            <div class="formula-block">
+              <span class="formula-main">θ = arctan(altura / base) = arctan(40 / 47) ≈ 40.4°</span>
+              <span class="formula-desc">Comprobación: √(47² + 40²) = √3809 ≈ 61.7 cm ✓</span>
+            </div>
+            <div class="ramp-diagram-wrap">
+              <canvas id="theoryCanvas"></canvas>
+            </div>
+            <p class="theory-p">Hay <strong>5 sensores IR (S0–S4)</strong> separados <strong>14 cm</strong> entre consecutivos
+              (zona instrumentada de <strong>56 cm</strong>). El ESP32 publica eventos y el resumen por MQTT.</p>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-acceleration">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Aceleración del proyectil</span>
+            <span class="theory-tag">Cinemática</span>
+          </div>
+          <div class="theory-body">
+            <p class="theory-p">En la rampa inclinada, la aceleración teórica con fricción es:</p>
+            <div class="formula-block">
+              <span class="formula-main">a = g · (sinθ − μ · cosθ)</span>
+              <span class="formula-desc">g = 9.8 m/s², θ = 40.4°, μ = coeficiente de fricción cinética</span>
+            </div>
+            <table class="var-table">
+              <thead><tr><th>Variable</th><th>Descripción</th><th>Valor en esta rampa</th></tr></thead>
+              <tbody>
+                <tr><td>g</td><td>Gravedad estándar</td><td>9.8 m/s²</td></tr>
+                <tr><td>θ</td><td>Ángulo de inclinación</td><td>40.4°</td></tr>
+                <tr><td>sinθ</td><td>Componente paralela</td><td>≈ 0.6494</td></tr>
+                <tr><td>cosθ</td><td>Componente normal</td><td>≈ 0.7604</td></tr>
+                <tr><td>μ</td><td>Fricción (material)</td><td>0.10 – 0.35</td></tr>
+              </tbody>
+            </table>
+            <div class="callout"><strong>Ejemplo teórico</strong> (μ = 0.15): a ≈ <strong>5.25 m/s²</strong>. Experimental:
+              <code>accelerations_ms2</code>.</div>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-velocity">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Velocidad del proyectil</span>
+            <span class="theory-tag">Cinemática</span>
+          </div>
+          <div class="theory-body">
+            <p class="theory-p">Con MCUA desde el reposo:</p>
+            <div class="formula-grid">
+              <div class="formula-block"><span class="formula-main">v = a · t</span><span class="formula-desc">Velocidad vs tiempo</span></div>
+              <div class="formula-block"><span class="formula-main">v = √(2 · a · s)</span><span class="formula-desc">Velocidad vs desplazamiento</span></div>
+            </div>
+            <p class="theory-p">El firmware envía la velocidad media por tramo en <code>velocities_ms</code>.</p>
+            <div class="formula-block">
+              <span class="formula-main">v̄ = distancia(S<sub>A</sub>, S<sub>B</sub>) / Δt</span>
+              <span class="formula-desc">Δt de <code>intervals_us</code></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-time">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Tiempo de tránsito</span>
+            <span class="theory-tag">Cinemática</span>
+          </div>
+          <div class="theory-body">
+            <div class="formula-grid">
+              <div class="formula-block"><span class="formula-main">s = ½ · a · t²</span><span class="formula-desc">MCUA</span></div>
+              <div class="formula-block"><span class="formula-main">t = √(2s / a)</span><span class="formula-desc">Tiempo vs distancia</span></div>
+            </div>
+            <p class="theory-p">Entre sensores: <code>intervals_us</code>. Tiempo total:
+              <strong>timestamps_us[n−1] − timestamps_us[0]</strong>.</p>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-sensors">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Los 5 sensores IR</span>
+            <span class="theory-tag">Instrumentación</span>
+          </div>
+          <div class="theory-body">
+            <p class="theory-p">Sensores <strong>S0–S4</strong> y orden real en <code>trigger_order</code>.</p>
+            <table class="var-table">
+              <thead><tr><th>Sensor</th><th>Posición (cm)</th><th>GPIO</th></tr></thead>
+              <tbody>
+                <tr><td>S0</td><td>0</td><td>15</td></tr>
+                <tr><td>S1</td><td>14</td><td>5</td></tr>
+                <tr><td>S2</td><td>28</td><td>18</td></tr>
+                <tr><td>S3</td><td>42</td><td>19</td></tr>
+                <tr><td>S4</td><td>56</td><td>21</td></tr>
+              </tbody>
+            </table>
+            <div class="callout">S3 puede interpolarse entre S2 y S4 (<code>interpolated_sensors</code>).</div>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-protocol">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Protocolo MQTT</span>
+            <span class="theory-tag">Comunicación</span>
+          </div>
+          <div class="theory-body">
+            <table class="var-table">
+              <thead><tr><th>Tópico</th><th>Contenido</th></tr></thead>
+              <tbody>
+                <tr><td><code>esp32/sensor/event</code></td><td>session_id, sensor_index, gpio, trigger_sequence, timestamp_us</td></tr>
+                <tr><td><code>esp32/session/summary</code></td><td>Resumen de ráfaga (ver sección siguiente)</td></tr>
+                <tr><td><code>esp32/status</code></td><td>p. ej. {"status":"online"}</td></tr>
+                <tr><td><code>esp32/commands</code></td><td>p. ej. reset_session</td></tr>
+              </tbody>
+            </table>
+            <p class="theory-p">El backend reenvía al dashboard por WebSocket: <code>sensor/event</code>,
+              <code>session/summary</code>, <code>status</code>.</p>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-summary">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Resumen de sesión</span>
+            <span class="theory-tag">session/summary</span>
+          </div>
+          <div class="theory-body">
+            <table class="var-table">
+              <thead><tr><th>Campo</th><th>Descripción</th></tr></thead>
+              <tbody>
+                <tr><td><code>session_id</code></td><td>ID de la ráfaga</td></tr>
+                <tr><td><code>sensors_triggered</code></td><td>Sensores que dispararon</td></tr>
+                <tr><td><code>order_ok</code></td><td>true si orden S0→S4</td></tr>
+                <tr><td><code>trigger_order</code></td><td>Orden cronológico real</td></tr>
+                <tr><td><code>interpolated_sensors</code></td><td>Sensores interpolados</td></tr>
+                <tr><td><code>timestamps_us</code></td><td>Tiempos en µs (orden cronológico)</td></tr>
+                <tr><td><code>intervals_us</code></td><td>Δt entre disparos consecutivos</td></tr>
+                <tr><td><code>velocities_ms</code></td><td>Velocidad media por tramo (m/s)</td></tr>
+                <tr><td><code>accelerations_ms2</code></td><td>Aceleración entre tramos (m/s²)</td></tr>
+              </tbody>
+            </table>
+            <div class="formula-block">
+              <span class="formula-main">intervals_us[i] = timestamps_us[i+1] − timestamps_us[i]</span>
+              <span class="formula-desc">En orden cronológico (trigger_order)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theory-section" id="th-calc">
+          <div class="theory-section-header">
+            <span class="theory-section-title">Cómo calcular paso a paso</span>
+            <span class="theory-tag">Procedimiento</span>
+          </div>
+          <div class="theory-body">
+            <p class="theory-p">Con el resumen MQTT del dashboard:</p>
+            <div class="steps-list">
+              <div class="step-item"><div class="step-num">1</div><div class="step-text">Revisa <code>order_ok</code> y <code>trigger_order</code>.</div></div>
+              <div class="step-item"><div class="step-num">2</div><div class="step-text">Tiempo total: <code>(timestamps_us[n−1] − timestamps_us[0]) / 10⁶</code> s.</div></div>
+              <div class="step-item"><div class="step-num">3</div><div class="step-text">Analiza <code>velocities_ms</code> por tramo (14 cm entre sensores adyacentes en orden físico).</div></div>
+              <div class="step-item"><div class="step-num">4</div><div class="step-text">Compara <code>accelerations_ms2</code> con a teórica <code>g·(sinθ − μ·cosθ)</code>.</div></div>
+              <div class="step-item"><div class="step-num">5</div><div class="step-text">Anota sensores en <code>interpolated_sensors</code> si aplica.</div></div>
+            </div>
+            <div class="callout"><strong>Consejo:</strong> exporta el CSV del registro de sesiones para comparar ensayos.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="/script.js"></script>
 </body>
 
 </html>
+
+<!-- 
+<div class="page" id="page-theory">
+  <div class="theory-layout">
+  
+    <nav class="theory-nav">
+      <a class="theory-nav-item active" href="#th-ramp">La rampa</a>
+      <a class="theory-nav-item" href="#th-acceleration">Aceleración</a>
+      <a class="theory-nav-item" href="#th-velocity">Velocidad</a>
+      <a class="theory-nav-item" href="#th-time">Tiempo</a>
+      <a class="theory-nav-item" href="#th-sensors">Sensores</a>
+      <a class="theory-nav-item" href="#th-calc">Cómo calcular</a>
+    </nav>
+  
+    <div class="theory-content">
+  
+      <div class="theory-section" id="th-ramp">
+        <div class="theory-section-header">
+          <span class="theory-section-title">La rampa instrumentada</span>
+          <span class="theory-tag">Geometría</span>
+        </div>
+        <div class="theory-body">
+          <p class="theory-p">La rampa tiene <strong>47 cm de base</strong>, <strong>40 cm de altura</strong> y <strong>61.7 cm de hipotenusa</strong>. Esto nos da un ángulo de inclinación fijo de <strong>40.4°</strong> respecto al suelo, calculado así:</p>
+          <div class="formula-block">
+            <span class="formula-main">θ = arctan(altura / base) = arctan(40 / 47) ≈ 40.4°</span>
+            <span class="formula-desc">Comprobación: √(47² + 40²) = √(2209 + 1600) = √3809 ≈ 61.7 cm ✓</span>
+          </div>
+          <div class="ramp-diagram-wrap">
+            <canvas id="theoryCanvas"></canvas>
+          </div>
+          <p class="theory-p">El proyectil se suelta desde el extremo superior y desciende a lo largo de la hipotenusa, pasando por los 6 sensores ubicados a distancias conocidas.</p>
+        </div>
+      </div>
+  
+      <div class="theory-section" id="th-acceleration">
+        <div class="theory-section-header">
+          <span class="theory-section-title">Aceleración del proyectil</span>
+          <span class="theory-tag">Cinemática</span>
+        </div>
+        <div class="theory-body">
+          <p class="theory-p">El proyectil es acelerado por la componente del peso paralela a la rampa, frenado parcialmente por la fricción. La aceleración neta es:</p>
+          <div class="formula-block">
+            <span class="formula-main">a = g · (sinθ − μ · cosθ)</span>
+            <span class="formula-desc">Donde g = 9.8 m/s², θ = ángulo de inclinación, μ = coeficiente de fricción cinética</span>
+          </div>
+          <table class="var-table">
+            <thead><tr><th>Variable</th><th>Descripción</th><th>Valor en esta rampa</th></tr></thead>
+            <tbody>
+              <tr><td>g</td><td>Gravedad estándar</td><td>9.8 m/s²</td></tr>
+              <tr><td>θ</td><td>Ángulo de inclinación</td><td>40.4°</td></tr>
+              <tr><td>sinθ</td><td>Componente paralela normalizada</td><td>≈ 0.6494</td></tr>
+              <tr><td>cosθ</td><td>Componente normal normalizada</td><td>≈ 0.7604</td></tr>
+              <tr><td>μ</td><td>Coeficiente de fricción (depende del material)</td><td>0.10 – 0.35</td></tr>
+            </tbody>
+          </table>
+          <div class="callout"><strong>Ejemplo:</strong> Con acero sobre madera (μ = 0.15):<br/>a = 9.8 × (0.6494 − 0.15 × 0.7604) = 9.8 × (0.6494 − 0.1141) = 9.8 × 0.5353 ≈ <strong>5.25 m/s²</strong></div>
+        </div>
+      </div>
+  
+      <div class="theory-section" id="th-velocity">
+        <div class="theory-section-header">
+          <span class="theory-section-title">Velocidad del proyectil</span>
+          <span class="theory-tag">Cinemática</span>
+        </div>
+        <div class="theory-body">
+          <p class="theory-p">Partiendo del reposo, la velocidad en cualquier punto de la rampa se obtiene de la ecuación de movimiento uniformemente acelerado (MCUA):</p>
+          <div class="formula-grid">
+            <div class="formula-block">
+              <span class="formula-main">v = a · t</span>
+              <span class="formula-desc">Velocidad en función del tiempo</span>
+            </div>
+            <div class="formula-block">
+              <span class="formula-main">v = √(2 · a · s)</span>
+              <span class="formula-desc">Velocidad en función del desplazamiento s</span>
+            </div>
+          </div>
+          <p class="theory-p">La segunda forma es especialmente útil porque la posición de cada sensor <strong>s</strong> es conocida, lo que permite calcular la velocidad instantánea sin medir el tiempo directamente.</p>
+          <div class="callout"><strong>Velocidad final</strong> al recorrer los 61.7 cm (L = 0.617 m) con a ≈ 5.25 m/s²:<br/>v = √(2 × 5.25 × 0.617) ≈ √6.479 ≈ <strong>2.55 m/s</strong></div>
+        </div>
+      </div>
+  
+      <div class="theory-section" id="th-time">
+        <div class="theory-section-header">
+          <span class="theory-section-title">Tiempo de tránsito</span>
+          <span class="theory-tag">Cinemática</span>
+        </div>
+        <div class="theory-body">
+          <p class="theory-p">El tiempo que tarda el proyectil en recorrer una distancia <strong>s</strong> desde el reposo es:</p>
+          <div class="formula-grid">
+            <div class="formula-block">
+              <span class="formula-main">s = ½ · a · t²</span>
+              <span class="formula-desc">Posición en función del tiempo (MCUA)</span>
+            </div>
+            <div class="formula-block">
+              <span class="formula-main">t = √(2s / a)</span>
+              <span class="formula-desc">Tiempo en función de la distancia s</span>
+            </div>
+          </div>
+          <p class="theory-p">Esta relación cuadrática entre posición y tiempo es la firma del MCUA. Si graficamos <strong>s vs t²</strong>, la pendiente de esa recta es <strong>a/2</strong>, lo que permite extraer experimentalmente la aceleración.</p>
+          <div class="callout"><strong>Tiempo total</strong> para recorrer L = 0.617 m con a ≈ 5.25 m/s²:<br/>t = √(2 × 0.617 / 5.25) = √(0.235) ≈ <strong>0.485 s</strong></div>
+        </div>
+      </div>
+  
+      <div class="theory-section" id="th-sensors">
+        <div class="theory-section-header">
+          <span class="theory-section-title">Los 6 sensores</span>
+          <span class="theory-tag">Instrumentación</span>
+        </div>
+        <div class="theory-body">
+          <p class="theory-p">Los sensores están distribuidos a lo largo de la hipotenusa. Cada uno registra el <strong>instante exacto</strong> en que el proyectil lo cruza. Con dos sensores consecutivos S<sub>i</sub> y S<sub>i+1</sub> podemos calcular la velocidad media en ese tramo:</p>
+          <div class="formula-block">
+            <span class="formula-main">v̄ = Δs / Δt = (s_{i+1} − s_i) / (t_{i+1} − t_i)</span>
+            <span class="formula-desc">Velocidad media entre dos sensores adyacentes</span>
+          </div>
+          <table class="var-table">
+            <thead><tr><th>Sensor</th><th>Posición (cm)</th><th>Descripción</th></tr></thead>
+            <tbody>
+              <tr><td>S1</td><td>5 cm</td><td>Primer registro — inicio del movimiento</td></tr>
+              <tr><td>S2</td><td>12 cm</td><td>Zona de baja velocidad</td></tr>
+              <tr><td>S3</td><td>20 cm</td><td>Cuarto de recorrido</td></tr>
+              <tr><td>S4</td><td>29 cm</td><td>Zona central</td></tr>
+              <tr><td>S5</td><td>39 cm</td><td>Tres cuartos del recorrido</td></tr>
+              <tr><td>S6</td><td>61.7 cm</td><td>Final de la rampa — velocidad máxima</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+  
+      <div class="theory-section" id="th-calc">
+        <div class="theory-section-header">
+          <span class="theory-section-title">Cómo calcular paso a paso</span>
+          <span class="theory-tag">Procedimiento</span>
+        </div>
+        <div class="theory-body">
+          <p class="theory-p">Dado que el backend envía <strong>aceleración, velocidad y tiempo</strong>, aquí se explica qué verificar y cómo interpretar esos datos:</p>
+          <div class="steps-list">
+            <div class="step-item"><div class="step-num">1</div><div class="step-text">Verifica la aceleración teórica: <code>a = g·(sinθ − μ·cosθ)</code>. Compara con el valor del sensor. La diferencia indica pérdidas no modeladas (rodadura, resistencia del aire).</div></div>
+            <div class="step-item"><div class="step-num">2</div><div class="step-text">Con la aceleración medida, calcula la velocidad esperada al final: <code>v = √(2·a·L)</code> donde L = 0.617 m. Coteja con el valor recibido del backend.</div></div>
+            <div class="step-item"><div class="step-num">3</div><div class="step-text">Verifica el tiempo: <code>t = √(2·L/a)</code>. Si el sensor reporta un t diferente, analiza si la aceleración fue constante a lo largo del recorrido.</div></div>
+            <div class="step-item"><div class="step-num">4</div><div class="step-text">Grafica <strong>posición vs t²</strong>. Debería ser una recta de pendiente <code>a/2</code>. Desviaciones indican fricción variable o errores de medición.</div></div>
+            <div class="step-item"><div class="step-num">5</div><div class="step-text">Compara ensayos con distintos materiales. La diferencia en aceleración refleja directamente el cambio en μ: <code>Δa = g·Δμ·cosθ</code>.</div></div>
+          </div>
+          <div class="callout"><strong>Consejo para el informe:</strong> reporta siempre la incertidumbre de cada medición. Para el tiempo usa ±0.001 s (resolución típica del sensor). Para la posición de los sensores, ±0.5 mm.</div>
+        </div>
+      </div>
+  
+    </div>
+  </div>
+  </div> -->

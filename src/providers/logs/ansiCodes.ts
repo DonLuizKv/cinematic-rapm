@@ -33,3 +33,7 @@ export const HTTP_METHOD_COLORS: Record<HttpMethods, Color> = {
 };
 
 export const RESET = "\x1b[0m";
+// ANSI cursor control codes
+export const CURSOR_UP = "\x1b[1A";   // move cursor up one line
+export const ERASE_LINE = "\x1b[2K";   // erase entire current line
+export const CURSOR_START = "\x1b[G";    // move cursor to column 0

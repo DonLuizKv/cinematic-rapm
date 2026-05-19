@@ -13,6 +13,27 @@ type MQTTBrokerDeps = {
     ws: WSServer;
 }
 
+type SessionSummaryPayload = {
+    session_id: number;
+    sensors_triggered: number;
+    order_ok: boolean;
+    interpolated_sensors?: number[];
+    trigger_order: number[];
+    timestamps_us: number[];
+    intervals_us: number[];
+    velocities_ms: number[];
+    accelerations_ms2: number[] | string;
+}
+
+type SensorEventPayload = {
+    session_id: number;
+    sensor_index: number;
+    gpio: number;
+    trigger_sequence: number;
+    timestamp_us: number;
+    interpolated?: boolean;
+}
+
 export class MQTTBroker implements IMQTTBroker {
     private client: MqttClient | null = null;
     private host: string;
@@ -34,24 +55,46 @@ export class MQTTBroker implements IMQTTBroker {
         });
 
         this.client.on('connect', () => {
+            // borra el error de conexión
+            Logger.clearLiveSlot("mqtt-error");
             Logger.mqtt('[MQTT] Conectado exitosamente al broker');
 
-            // aqui se cambiarán los eventos
-            this.subscribe('esp32/telemetry');
-            this.subscribe('esp32/status');
+            this.subscribe('esp32/#');
         });
 
         this.client.on('message', (topic, message) => {
-            Logger.mqtt(`[MQTT] Mensaje recibido en [${topic}]: ${message.toString()}`);
-            this.handleMessage(topic, message.toString());
+            const topicName = topic.toString().trim();
+            const payload = message.toString();
+
+            if (topicName.includes('session/summary')) {
+                Logger.mqtt(`[MQTT] Raw session/summary en [${topicName}] (${payload.length} bytes)`);
+                this.handleSessionSummaryMessage(payload);
+                return;
+            }
+
+            if (topicName.endsWith('sensor/event')) {
+                this.handleSensorsMessage(payload);
+                return;
+            }
+
+            if (topicName.endsWith('status')) {
+                this.handleStatusMessage(payload);
+                return;
+            }
+
+            if (topicName.endsWith('commands')) {
+                return;
+            }
+
+            Logger.warn(`[MQTT] Tópico no gestionado: ${topicName}`);
         });
 
         this.client.on('error', (error) => {
-            Logger.error(`[MQTT] Error de conexión: ${error.message}`);
+            Logger.error(`[MQTT] Error de conexión: ${error}`, { live: { key: "mqtt-error", lines: 1 } });
         });
 
         this.client.on('offline', () => {
-            Logger.error(`[MQTT] Cliente desconectado (offline): ${this.host}`);
+            Logger.error(`[MQTT] Cliente desconectado (offline): ${this.host}`, { live: { key: "mqtt-offline", lines: 1 } });
         });
     }
 
@@ -81,22 +124,59 @@ export class MQTTBroker implements IMQTTBroker {
         }
     }
 
-    private handleMessage(topic: string, message: string): void {
-        // Lógica para manejar mensajes según el tópico
-        if (topic === 'esp32/telemetry') {
-            try {
-                const data = JSON.parse(message);
-                Logger.mqtt(`[MQTT] Telemetría del ESP32: ${JSON.stringify(data)}`);
-                console.log("hola", data);
-                this.ws.emitMessage<object>('telemetry', data);
-            } catch (e) {
-                Logger.mqtt(`[MQTT] Telemetría del ESP32 (texto): ${message}`);
-                console.log("adios", message);
-                this.ws.emitMessage<object>('telemetry', { data: message });
-            }
-        } else if (topic === 'esp32/status') {
-            Logger.mqtt(`[MQTT] Estado del ESP32: ${message}`);
-            this.ws.emitMessage<object>('status', { data: message });
+    private handleStatusMessage(raw: string): void {
+        let isOnline = false;
+        let source = 'unknown';
+        try {
+            const data = JSON.parse(raw) as { status?: string; source?: string };
+            isOnline = data.status === 'online';
+            source = data.source ?? 'status';
+        } catch {
+            isOnline = raw.includes('online');
+        }
+        Logger.mqtt(`[MQTT] Estado ESP32: ${isOnline ? 'online' : 'offline'} (${source})`, { live: { key: "esp-status", lines: 1 } });
+        this.ws.emitMessage<{ online: boolean; source?: string }>('status', { online: isOnline, source });
+    }
+
+    private handleSessionSummaryMessage(raw: string): void {
+        try {
+            const data = JSON.parse(raw) as SessionSummaryPayload;
+            this.normalizeSummaryPayload(data);
+
+            Logger.mqtt(
+                `[MQTT] session/summary — id=${data.session_id} ` +
+                `sensores=${data.sensors_triggered} orden_ok=${data.order_ok} ` +
+                `trigger_order=[${(data.trigger_order ?? []).join(',')}]`
+            );
+            Logger.mqtt(`[MQTT] session/summary — intervals_us=${JSON.stringify(data.intervals_us)}`);
+            Logger.mqtt(`[MQTT] session/summary — velocities_ms=${JSON.stringify(data.velocities_ms)}`);
+            Logger.mqtt(`[MQTT] session/summary — accelerations_ms2=${JSON.stringify(data.accelerations_ms2)}`);
+
+            this.ws.emitMessage<SessionSummaryPayload>('session/summary', data);
+        } catch (err) {
+            Logger.error(`[MQTT] Error al parsear session/summary: ${err}`);
+            Logger.error(`[MQTT] Payload crudo session/summary: ${raw}`);
         }
     }
+
+    private normalizeSummaryPayload(data: SessionSummaryPayload): void {
+        if (typeof data.accelerations_ms2 === 'string') {
+            data.accelerations_ms2 = JSON.parse(data.accelerations_ms2) as number[];
+        }
+    }
+
+    private handleSensorsMessage(raw: string): void {
+        try {
+            const data = JSON.parse(raw) as SensorEventPayload;
+            Logger.mqtt(
+                `[MQTT] sensor/event — sesión=${data.session_id} S${data.sensor_index} ` +
+                `sec=${data.trigger_sequence} t=${data.timestamp_us}µs`
+            );
+            this.ws.emitMessage<SensorEventPayload>('sensor/event', data);
+        } catch (err) {
+            Logger.error(`[MQTT] Error al parsear sensor/event: ${err}`);
+            Logger.error(`[MQTT] Payload crudo sensor/event: ${raw}`);
+        }
+    }
+
 }

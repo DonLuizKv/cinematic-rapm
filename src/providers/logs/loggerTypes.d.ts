@@ -17,4 +17,14 @@ export interface ExtraConfigLog {
     styles?: LogConfig;
     prefix?: string;
     suffix?: string;
+    live?: LiveLogOptions;
+}
+
+export interface LiveLogOptions {
+    key: string;
+    lines?: number;
+}
+
+interface LiveSlot {
+    lines: number;
 }

@@ -1,6 +1,5 @@
 import type { Server as HTTPServer } from 'node:http';
 import { Server, Socket } from "socket.io";
-import { Env } from '../../config/Env';
 import { Logger } from '../logs/logger';
 
 export class WSServer {
@@ -10,8 +9,10 @@ export class WSServer {
 
     private constructor(server: HTTPServer) {
         this.io = new Server(server, {
-            transports: ["websocket"],
-            path: "/api/v1/ws",
+            cors: {
+                origin: '*',          // en producción restringir a la URL del frontend
+                methods: ['GET', 'POST'],
+            },
         });
     }
 

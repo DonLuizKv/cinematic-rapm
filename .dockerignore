@@ -1,4 +1,8 @@
 node_modules
 dist
 .env
-arduino
+.env.local
+.env.*.local
+.git
+.gitignore
+README.md

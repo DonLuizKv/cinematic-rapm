@@ -1,5 +1,5 @@
 # ── Stage 1: Build ─────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install pnpm (matches pnpm-lock.yaml)
@@ -15,7 +15,7 @@ COPY src/ ./src/
 RUN pnpm run build
 
 # ── Stage 2: Production ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Install pnpm in the runner image
@@ -27,6 +27,9 @@ RUN pnpm install --frozen-lockfile --prod
 
 # Copy compiled output from builder
 COPY --from=builder /app/dist ./dist
+
+# Archivos estáticos del dashboard (Express sirve process.cwd()/public)
+COPY public ./public
 
 # Expose the port the backend listens on (see Env.Global.PORT → 5000)
 EXPOSE 5000

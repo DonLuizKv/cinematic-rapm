@@ -34,13 +34,22 @@ type SensorEventPayload = {
     interpolated?: boolean;
 }
 
+/** mqtt.js exige protocolo (p. ej. mqtt://host:1883). En Docker suele ponerse solo el hostname del servicio. */
+function normalizeMqttUrl(host: string): string {
+    const t = host.trim();
+    if (/^(mqtt|mqtts|tcp|ssl|ws|wss):\/\//i.test(t)) {
+        return t;
+    }
+    return t.includes(":") ? `mqtt://${t}` : `mqtt://${t}:1883`;
+}
+
 export class MQTTBroker implements IMQTTBroker {
     private client: MqttClient | null = null;
     private host: string;
     private ws: WSServer;
 
     constructor(private deps: MQTTBrokerDeps) {
-        this.host = deps.host;
+        this.host = normalizeMqttUrl(deps.host);
         this.ws = deps.ws;
     }
 
